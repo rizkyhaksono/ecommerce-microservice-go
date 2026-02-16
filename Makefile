@@ -1,43 +1,47 @@
-include .env
-export $(shell sed 's/=.*//' .env)
+# Microservices Makefile
 
-start:
-	@go run main.go
-lint:
-	@golangci-lint run ./...
-tests:
-	@go test -v ./Test/...
-tests-%:
-	@go test -v ./Test/... -run=$(shell echo $* | sed 's/_/./g')
-testsum:
-	@cd Test && gotestsum --format testname
-integration-test:
-	@./scripts/run-integration-test.bash
+.PHONY: build up down logs restart clean
+
+# Build all services
+build:
+	@echo "Building all services..."
+	docker compose build
+
+# Start all services
+up:
+	@echo "Starting services..."
+	docker compose up -d
+
+# Stop all services
+down:
+	@echo "Stopping services..."
+	docker compose down
+
+# View logs
+logs:
+	docker compose logs -f
+
+# Restart all services
+restart: down up
+
+# Clean up docker resources
+clean:
+	docker compose down -v --rmi local --remove-orphans
+
+# Run tests (requires services to be running for integration tests, or use go test locally)
+test:
+	@echo "Running tests in all services..."
+	go test ./pkg/... ./services/...
+
+# Sync shared packages (workspace)
+sync:
+	go work sync
+
+# Generate swagger docs (requires swaggo installed)
 swagger:
-	@swag init --parseDependency --parseInternal
-swagger-docker:
-	@docker run --rm -v ./:/code ghcr.io/swaggo/swag:latest init --parseDependency --parseInternal
-migration-%:
-	@migrate create -ext sql -dir src/database/migrations create-table-$(subst :,_,$*)
-migration-docker-%:
-	@docker run --rm -v ./src/database/migrations:/migrations migrate/migrate create -ext sql -dir /migrations $(subst :,_,$*)
-migrate-up:
-	@migrate -database "postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable" -path src/database/migrations up
-migrate-down:
-	@migrate -database "postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable" -path src/database/migrations down
-migrate-docker-up:
-	@docker run --rm --network host -v ./src/database/migrations:/migrations migrate/migrate -path=/migrations/ -database postgres://$(DB_USER):$(DB_PASSWORD)@localhost:$(DB_PORT)/$(DB_NAME)?sslmode=disable up
-migrate-docker-down:
-	@docker run --rm --network host -v ./src/database/migrations:/migrations migrate/migrate -path=/migrations/ -database postgres://$(DB_USER):$(DB_PASSWORD)@localhost:$(DB_PORT)/$(DB_NAME)?sslmode=disable down 1
-migrate-docker-production-up:
-	@docker run --rm --network host -v ./src/database/migrations:/migrations migrate/migrate -path=/migrations/ -database postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable up
-migrate-docker-production-down:
-	@docker run --rm --network host -v ./src/database/migrations:/migrations migrate/migrate -path=/migrations/ -database postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable down 1
-docker:
-	@docker compose up --build -d
-docker-test:
-	@docker compose up -d && make tests
-docker-down:
-	@docker compose down --rmi all --volumes --remove-orphans
-docker-cache:
-	@docker builder prune -f
+	@echo "Generating swagger for User Service..."
+	cd services/user && swag init --parseDependency --parseInternal
+	@echo "Generating swagger for Catalog Service..."
+	cd services/catalog && swag init --parseDependency --parseInternal
+	@echo "Generating swagger for Order Service..."
+	cd services/order && swag init --parseDependency --parseInternal

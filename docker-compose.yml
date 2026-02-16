@@ -1,78 +1,143 @@
 version: "3.9"
 
 services:
-  postgres:
-    image: postgres:17.4
-    restart: always
-    env_file:
-      - .env
+  # ─── Databases ──────────────────────────────────────────
+  user-db:
+    image: postgres:16-alpine
     environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      POSTGRES_DB: user_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - user_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d user_db"]
       interval: 10s
       timeout: 5s
-      start_period: 30s
       retries: 5
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    networks:
-      - go-network
 
-  go-microservice:
+  catalog-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: catalog_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - catalog_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d catalog_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  order-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+    volumes:
+      - order_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d order_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Services ───────────────────────────────────────────
+  user-service:
     build:
       context: .
-    image: go-microservice
-    restart: on-failure
-    env_file:
-      - .env
+      dockerfile: services/user/Dockerfile
+    environment:
+      SERVER_PORT: "8081"
+      GO_ENV: production
+      DB_HOST: user-db
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: user_db
+      DB_SSLMODE: disable
+      JWT_ACCESS_SECRET_KEY: ${JWT_ACCESS_SECRET_KEY:-super-secret-access-key}
+      JWT_REFRESH_SECRET_KEY: ${JWT_REFRESH_SECRET_KEY:-super-secret-refresh-key}
+      JWT_ACCESS_TIME_MINUTE: "60"
+      JWT_REFRESH_TIME_HOUR: "24"
+      START_USER_EMAIL: ${START_USER_EMAIL:-admin@example.com}
+      START_USER_PW: ${START_USER_PW:-admin123}
+    ports:
+      - "8081:8081"
+    depends_on:
+      user-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  catalog-service:
+    build:
+      context: .
+      dockerfile: services/catalog/Dockerfile
+    environment:
+      SERVER_PORT: "8082"
+      GO_ENV: production
+      DB_HOST: catalog-db
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: catalog_db
+      DB_SSLMODE: disable
+      JWT_ACCESS_SECRET_KEY: ${JWT_ACCESS_SECRET_KEY:-super-secret-access-key}
+    ports:
+      - "8082:8082"
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  order-service:
+    build:
+      context: .
+      dockerfile: services/order/Dockerfile
+    environment:
+      SERVER_PORT: "8083"
+      GO_ENV: production
+      DB_HOST: order-db
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: order_db
+      DB_SSLMODE: disable
+      JWT_ACCESS_SECRET_KEY: ${JWT_ACCESS_SECRET_KEY:-super-secret-access-key}
+    ports:
+      - "8083:8083"
+    depends_on:
+      order-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    environment:
+      SERVER_PORT: "8080"
+      GO_ENV: production
+      USER_SERVICE_URL: http://user-service:8081
+      CATALOG_SERVICE_URL: http://catalog-service:8082
+      ORDER_SERVICE_URL: http://order-service:8083
     ports:
       - "8080:8080"
     depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - go-network
-    environment:
-      # Server Configuration
-      - SERVER_PORT=${SERVER_PORT:-8080}
-      
-      # Database Configuration
-      - DB_HOST=${DB_HOST:-postgres}
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME}
-      - DB_SSLMODE=${DB_SSLMODE:-disable}
-      
-      # Database Connection Pool Configuration
-      - DB_MAX_IDLE_CONNS=${DB_MAX_IDLE_CONNS:-10}
-      - DB_MAX_OPEN_CONNS=${DB_MAX_OPEN_CONNS:-50}
-      - DB_CONN_MAX_LIFETIME=${DB_CONN_MAX_LIFETIME:-300}
-      
-      # JWT Configuration
-      - JWT_ACCESS_SECRET_KEY=${JWT_ACCESS_SECRET_KEY}
-      - JWT_ACCESS_TIME_MINUTE=${JWT_ACCESS_TIME_MINUTE:-15}
-      - JWT_REFRESH_SECRET_KEY=${JWT_REFRESH_SECRET_KEY}
-      - JWT_REFRESH_TIME_HOUR=${JWT_REFRESH_TIME_HOUR:-168}
-      - JWT_ISSUER=${JWT_ISSUER}
-      
-      # Initial User Configuration
-      - START_USER_EMAIL=${START_USER_EMAIL:-gbrayhan@gmail.com}
-      - START_USER_PW=${START_USER_PW:-qweqwe}
-      
-      # Optional External Services
-      - IMGUR_CLIENT_ID=${IMGUR_CLIENT_ID:-}
-      - WKHTMLTOPDF_BIN=${WKHTMLTOPDF_BIN:-/usr/local/bin/wkhtmltopdf}
-      
+      - user-service
+      - catalog-service
+      - order-service
+    restart: unless-stopped
 
 volumes:
-  pgdata:
-
-networks:
-  go-network:
-    driver: bridge
+  user_data:
+  catalog_data:
+  order_data:

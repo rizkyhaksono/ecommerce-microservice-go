@@ -1,0 +1,290 @@
+basePath: /v1
+definitions:
+  controllers.MessageResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  handler.NewCategoryRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      slug:
+        type: string
+    required:
+    - name
+    - slug
+    type: object
+  handler.NewProductRequest:
+    properties:
+      categoryId:
+        type: integer
+      description:
+        type: string
+      imageUrl:
+        type: string
+      isActive:
+        type: boolean
+      name:
+        type: string
+      price:
+        type: number
+      sku:
+        type: string
+      stock:
+        type: integer
+    required:
+    - categoryId
+    - name
+    - price
+    - sku
+    type: object
+  handler.ResponseCategory:
+    properties:
+      createdAt:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      slug:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  handler.ResponseProduct:
+    properties:
+      categoryId:
+        type: integer
+      createdAt:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      imageUrl:
+        type: string
+      isActive:
+        type: boolean
+      name:
+        type: string
+      price:
+        type: number
+      sku:
+        type: string
+      stock:
+        type: integer
+      updatedAt:
+        type: string
+    type: object
+host: localhost:9090
+info:
+  contact: {}
+  description: Category and Product microservice
+  title: Catalog Service API
+  version: 1.0.0
+paths:
+  /category/:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.ResponseCategory'
+            type: array
+      summary: Get all categories
+      tags:
+      - Category
+    post:
+      parameters:
+      - description: Category
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewCategoryRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ResponseCategory'
+      security:
+      - BearerAuth: []
+      summary: Create category
+      tags:
+      - Category
+  /category/{id}:
+    delete:
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete category
+      tags:
+      - Category
+    get:
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ResponseCategory'
+      summary: Get category by ID
+      tags:
+      - Category
+    put:
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ResponseCategory'
+      security:
+      - BearerAuth: []
+      summary: Update category
+      tags:
+      - Category
+  /product/:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.ResponseProduct'
+            type: array
+      summary: Get all products
+      tags:
+      - Product
+    post:
+      parameters:
+      - description: Product
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewProductRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ResponseProduct'
+      security:
+      - BearerAuth: []
+      summary: Create product
+      tags:
+      - Product
+  /product/{id}:
+    delete:
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete product
+      tags:
+      - Product
+    get:
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ResponseProduct'
+      summary: Get product by ID
+      tags:
+      - Product
+    put:
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ResponseProduct'
+      security:
+      - BearerAuth: []
+      summary: Update product
+      tags:
+      - Product
+  /product/category/{categoryId}:
+    get:
+      parameters:
+      - description: Category ID
+        in: path
+        name: categoryId
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.ResponseProduct'
+            type: array
+      summary: Get products by category
+      tags:
+      - Product
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

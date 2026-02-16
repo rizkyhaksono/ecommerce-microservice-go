@@ -1,3 +1,15 @@
+// @title           Ecommerce Microservice API
+// @version         2.0.0
+// @description     A production-ready microservices boilerplate built with Go, implementing Clean Architecture principles.
+
+// @host            localhost:8080
+// @BasePath        /v1
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Enter "Bearer {token}" (with quotes removed)
+
 package main
 
 import (
@@ -6,6 +18,7 @@ import (
 	"os"
 	"time"
 
+	_ "github.com/gbrayhan/microservices-go/docs"
 	"github.com/gbrayhan/microservices-go/src/infrastructure/di"
 	logger "github.com/gbrayhan/microservices-go/src/infrastructure/logger"
 	"github.com/gbrayhan/microservices-go/src/infrastructure/rest/middlewares"

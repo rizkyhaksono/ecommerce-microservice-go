@@ -28,6 +28,17 @@ func NewAuthController(authUsecase useCaseAuth.IAuthUseCase, loggerInstance *log
 	}
 }
 
+// Login godoc
+// @Summary      User login
+// @Description  Authenticate user with email and password, returns JWT tokens
+// @Tags         Auth
+// @Accept       json
+// @Produce      json
+// @Param        request body LoginRequest true "Login credentials"
+// @Success      200 {object} LoginResponse
+// @Failure      400 {object} controllers.MessageResponse
+// @Failure      401 {object} controllers.MessageResponse
+// @Router       /auth/login [post]
 func (c *AuthController) Login(ctx *gin.Context) {
 	c.Logger.Info("User login request")
 	var request LoginRequest
@@ -66,6 +77,17 @@ func (c *AuthController) Login(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, response)
 }
 
+// GetAccessTokenByRefreshToken godoc
+// @Summary      Refresh access token
+// @Description  Get a new access token using a valid refresh token
+// @Tags         Auth
+// @Accept       json
+// @Produce      json
+// @Param        request body AccessTokenRequest true "Refresh token"
+// @Success      200 {object} LoginResponse
+// @Failure      400 {object} controllers.MessageResponse
+// @Failure      401 {object} controllers.MessageResponse
+// @Router       /auth/access-token [post]
 func (c *AuthController) GetAccessTokenByRefreshToken(ctx *gin.Context) {
 	c.Logger.Info("Token refresh request")
 	var request AccessTokenRequest

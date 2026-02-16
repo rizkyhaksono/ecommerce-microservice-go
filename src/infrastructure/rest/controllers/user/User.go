@@ -56,6 +56,19 @@ func NewUserController(userService domainUser.IUserService, loggerInstance *logg
 	return &UserController{userService: userService, Logger: loggerInstance}
 }
 
+// NewUser godoc
+// @Summary      Create a new user
+// @Description  Create a new user account with the provided details
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        request body NewUserRequest true "User details"
+// @Success      200 {object} ResponseUser
+// @Failure      400 {object} controllers.MessageResponse
+// @Failure      401 {object} controllers.MessageResponse
+// @Failure      409 {object} controllers.MessageResponse
+// @Router       /user/ [post]
 func (c *UserController) NewUser(ctx *gin.Context) {
 	c.Logger.Info("Creating new user")
 	var request NewUserRequest
@@ -76,6 +89,16 @@ func (c *UserController) NewUser(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, userResponse)
 }
 
+// GetAllUsers godoc
+// @Summary      Get all users
+// @Description  Retrieve a list of all users
+// @Tags         User
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200 {array} ResponseUser
+// @Failure      401 {object} controllers.MessageResponse
+// @Failure      500 {object} controllers.MessageResponse
+// @Router       /user/ [get]
 func (c *UserController) GetAllUsers(ctx *gin.Context) {
 	c.Logger.Info("Getting all users")
 	users, err := c.userService.GetAll()
@@ -89,6 +112,18 @@ func (c *UserController) GetAllUsers(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, arrayDomainToResponseMapper(users))
 }
 
+// GetUsersByID godoc
+// @Summary      Get user by ID
+// @Description  Retrieve a single user by their ID
+// @Tags         User
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path int true "User ID"
+// @Success      200 {object} ResponseUser
+// @Failure      400 {object} controllers.MessageResponse
+// @Failure      401 {object} controllers.MessageResponse
+// @Failure      404 {object} controllers.MessageResponse
+// @Router       /user/{id} [get]
 func (c *UserController) GetUsersByID(ctx *gin.Context) {
 	userID, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
@@ -108,6 +143,20 @@ func (c *UserController) GetUsersByID(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, domainToResponseMapper(user))
 }
 
+// UpdateUser godoc
+// @Summary      Update a user
+// @Description  Update user fields by ID (partial update supported)
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path int true "User ID"
+// @Param        request body map[string]interface{} true "Fields to update"
+// @Success      200 {object} ResponseUser
+// @Failure      400 {object} controllers.MessageResponse
+// @Failure      401 {object} controllers.MessageResponse
+// @Failure      404 {object} controllers.MessageResponse
+// @Router       /user/{id} [put]
 func (c *UserController) UpdateUser(ctx *gin.Context) {
 	userID, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
@@ -141,6 +190,18 @@ func (c *UserController) UpdateUser(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, domainToResponseMapper(userUpdated))
 }
 
+// DeleteUser godoc
+// @Summary      Delete a user
+// @Description  Delete a user by ID
+// @Tags         User
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path int true "User ID"
+// @Success      200 {object} controllers.MessageResponse
+// @Failure      400 {object} controllers.MessageResponse
+// @Failure      401 {object} controllers.MessageResponse
+// @Failure      404 {object} controllers.MessageResponse
+// @Router       /user/{id} [delete]
 func (c *UserController) DeleteUser(ctx *gin.Context) {
 	userID, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
@@ -160,6 +221,20 @@ func (c *UserController) DeleteUser(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"message": "resource deleted successfully"})
 }
 
+// SearchPaginated godoc
+// @Summary      Search users with pagination
+// @Description  Search users with filters, sorting, and pagination support
+// @Tags         User
+// @Produce      json
+// @Security     BearerAuth
+// @Param        page query int false "Page number" default(1)
+// @Param        pageSize query int false "Page size" default(10)
+// @Param        sortBy query []string false "Sort by fields"
+// @Param        sortDirection query string false "Sort direction (asc/desc)" default(asc)
+// @Success      200 {object} map[string]interface{}
+// @Failure      401 {object} controllers.MessageResponse
+// @Failure      500 {object} controllers.MessageResponse
+// @Router       /user/search [get]
 func (c *UserController) SearchPaginated(ctx *gin.Context) {
 	c.Logger.Info("Searching users with pagination")
 
@@ -256,6 +331,18 @@ func (c *UserController) SearchPaginated(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, response)
 }
 
+// SearchByProperty godoc
+// @Summary      Search users by property
+// @Description  Search users by a specific property and search text
+// @Tags         User
+// @Produce      json
+// @Security     BearerAuth
+// @Param        property query string true "Property to search by (userName, email, firstName, lastName, status)"
+// @Param        searchText query string true "Text to search for"
+// @Success      200 {array} ResponseUser
+// @Failure      400 {object} controllers.MessageResponse
+// @Failure      401 {object} controllers.MessageResponse
+// @Router       /user/search-property [get]
 func (c *UserController) SearchByProperty(ctx *gin.Context) {
 	property := ctx.Query("property")
 	searchText := ctx.Query("searchText")

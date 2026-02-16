@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   # ─── Databases ──────────────────────────────────────────
   user-db:
@@ -9,7 +7,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5433:5432"
+      - "5500:5432"
     volumes:
       - user_data:/var/lib/postgresql/data
     healthcheck:
@@ -25,7 +23,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5434:5432"
+      - "5501:5432"
     volumes:
       - catalog_data:/var/lib/postgresql/data
     healthcheck:
@@ -41,7 +39,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5435:5432"
+      - "5502:5432"
     volumes:
       - order_data:/var/lib/postgresql/data
     healthcheck:
@@ -56,7 +54,7 @@ services:
       context: .
       dockerfile: services/user/Dockerfile
     environment:
-      SERVER_PORT: "8081"
+      SERVER_PORT: "9091"
       GO_ENV: production
       DB_HOST: user-db
       DB_PORT: "5432"
@@ -71,7 +69,7 @@ services:
       START_USER_EMAIL: ${START_USER_EMAIL:-admin@example.com}
       START_USER_PW: ${START_USER_PW:-admin123}
     ports:
-      - "8081:8081"
+      - "9091:9091"
     depends_on:
       user-db:
         condition: service_healthy
@@ -82,7 +80,7 @@ services:
       context: .
       dockerfile: services/catalog/Dockerfile
     environment:
-      SERVER_PORT: "8082"
+      SERVER_PORT: "9092"
       GO_ENV: production
       DB_HOST: catalog-db
       DB_PORT: "5432"
@@ -92,7 +90,7 @@ services:
       DB_SSLMODE: disable
       JWT_ACCESS_SECRET_KEY: ${JWT_ACCESS_SECRET_KEY:-super-secret-access-key}
     ports:
-      - "8082:8082"
+      - "9092:9092"
     depends_on:
       catalog-db:
         condition: service_healthy
@@ -103,7 +101,7 @@ services:
       context: .
       dockerfile: services/order/Dockerfile
     environment:
-      SERVER_PORT: "8083"
+      SERVER_PORT: "9093"
       GO_ENV: production
       DB_HOST: order-db
       DB_PORT: "5432"
@@ -113,7 +111,7 @@ services:
       DB_SSLMODE: disable
       JWT_ACCESS_SECRET_KEY: ${JWT_ACCESS_SECRET_KEY:-super-secret-access-key}
     ports:
-      - "8083:8083"
+      - "9093:9093"
     depends_on:
       order-db:
         condition: service_healthy
@@ -124,13 +122,13 @@ services:
       context: .
       dockerfile: services/gateway/Dockerfile
     environment:
-      SERVER_PORT: "8080"
+      SERVER_PORT: "9090"
       GO_ENV: production
-      USER_SERVICE_URL: http://user-service:8081
-      CATALOG_SERVICE_URL: http://catalog-service:8082
-      ORDER_SERVICE_URL: http://order-service:8083
+      USER_SERVICE_URL: http://user-service:9091
+      CATALOG_SERVICE_URL: http://catalog-service:9092
+      ORDER_SERVICE_URL: http://order-service:9093
     ports:
-      - "8080:8080"
+      - "9090:9090"
     depends_on:
       - user-service
       - catalog-service

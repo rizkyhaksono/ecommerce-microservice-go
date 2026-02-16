@@ -1,0 +1,125 @@
+---
+description: "Go coding conventions: naming, interfaces, constructors, imports for this project"
+alwaysApply: true
+---
+
+# Go Coding Conventions
+
+## Naming Conventions
+
+### Interfaces
+- Prefix with `I`: `IUserService`, `IMedicineController`, `IJWTService`, `IAuthUseCase`
+- Repository interfaces use suffix `RepositoryInterface`: `MedicineRepositoryInterface`, `UserRepositoryInterface`
+- Interfaces are defined in the package of the CONSUMER, not the implementor:
+  - Domain service interfaces → `src/domain/<entity>/`
+  - Repository interfaces → `src/infrastructure/repository/psql/<entity>/`
+  - Controller interfaces → `src/infrastructure/rest/controllers/<entity>/`
+  - Use case interfaces → `src/application/usecases/<entity>/`
+
+### Constructors
+- Always `NewXxx()` returning the INTERFACE type, never the concrete struct
+- Accept dependencies as parameters (dependency injection)
+
+```go
+// ✅ CORRECT
+func NewMedicineUseCase(repo medicine.MedicineRepositoryInterface, log *logger.Logger) IMedicineUseCase {
+    return &MedicineUseCase{medicineRepository: repo, Logger: log}
+}
+
+// ❌ WRONG — returns concrete type
+func NewMedicineUseCase(repo medicine.MedicineRepositoryInterface, log *logger.Logger) *MedicineUseCase {
+    return &MedicineUseCase{...}
+}
+```
+
+### Packages
+- One package per entity: `domain/user/`, `domain/medicine/`
+- Use import aliases to avoid collision: `medicineDomain "...domain/medicine"`, `domainError "...domain/errors"`
+- Common aliases used in this project:
+  - `domainError` or `domainErrors` → `src/domain/errors`
+  - `medicineDomain` or `domainMedicine` → `src/domain/medicine`
+  - `userDomain` or `domainUser` → `src/domain/user`
+  - `logger` → `src/infrastructure/logger`
+
+### Files
+- Domain entities: `<entity>.go` (lowercase) — e.g., `user.go`, `Medicine.go`
+- Use case: `<entity>.go` (lowercase)
+- Controllers: `<Entity>.go` (PascalCase) with separate `Validation.go`
+- Routes: `<entity>.go` (lowercase)
+- Tests: `<entity>_test.go` alongside source
+
+## Struct Patterns
+
+### Domain Entity — pure, no external dependencies
+```go
+type Medicine struct {
+    ID          int
+    Name        string
+    Description string
+    EanCode     string
+    Laboratory  string
+    CreatedAt   time.Time
+    UpdatedAt   time.Time
+}
+```
+
+### GORM Repository Model — separate from domain entity
+```go
+type Medicine struct {
+    ID          int       `gorm:"primaryKey"`
+    Name        string    `gorm:"unique"`
+    Description string
+    EANCode     string    `gorm:"unique"`
+    Laboratory  string
+    CreatedAt   time.Time `gorm:"autoCreateTime:milli"`
+    UpdatedAt   time.Time `gorm:"autoUpdateTime:milli"`
+}
+
+func (*Medicine) TableName() string { return "medicines" }
+```
+
+### Controller Request/Response — separate from domain
+```go
+type NewMedicineRequest struct {
+    Name        string `json:"name" binding:"required"`
+    Description string `json:"description" binding:"required"`
+    Laboratory  string `json:"laboratory" binding:"required"`
+    EanCode     string `json:"eanCode" binding:"required"`
+}
+
+type ResponseMedicine struct {
+    ID          int       `json:"id"`
+    Name        string    `json:"name"`
+    Description string    `json:"description"`
+    EanCode     string    `json:"eanCode"`
+    Laboratory  string    `json:"laboratory"`
+    CreatedAt   time.Time `json:"createdAt,omitempty"`
+    UpdatedAt   time.Time `json:"updatedAt,omitempty"`
+}
+```
+
+## Import Organization
+
+Standard Go import grouping:
+```go
+import (
+    // stdlib
+    "errors"
+    "net/http"
+    "strconv"
+    "time"
+
+    // project domain
+    "github.com/gbrayhan/microservices-go/src/domain"
+    domainError "github.com/gbrayhan/microservices-go/src/domain/errors"
+    medicineDomain "github.com/gbrayhan/microservices-go/src/domain/medicine"
+
+    // project infrastructure
+    logger "github.com/gbrayhan/microservices-go/src/infrastructure/logger"
+    "github.com/gbrayhan/microservices-go/src/infrastructure/rest/controllers"
+
+    // third-party
+    "github.com/gin-gonic/gin"
+    "go.uber.org/zap"
+)
+```

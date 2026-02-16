@@ -1,0 +1,102 @@
+---
+description: "Error handling and logging patterns: AppError, Zap structured logging"
+alwaysApply: true
+---
+
+# Error Handling & Logging
+
+## Error Handling with AppError
+
+This project uses a centralized error system via `src/domain/errors/Errors.go`.
+
+### Error Types Available
+```go
+NotFound              // → HTTP 404
+ValidationError       // → HTTP 400
+ResourceAlreadyExists // → HTTP 409 (handled in repository)
+RepositoryError       // → HTTP 500
+NotAuthenticated      // → HTTP 401
+TokenGeneratorError   // → HTTP 500
+NotAuthorized         // → HTTP 403
+UnknownError          // → HTTP 500
+```
+
+### Creating Errors
+```go
+// With custom message
+domainErrors.NewAppError(errors.New("medicine id is invalid"), domainErrors.ValidationError)
+
+// With default message for the type
+domainErrors.NewAppErrorWithType(domainErrors.NotFound)
+```
+
+### In Controllers — pass to Gin error middleware
+```go
+// ✅ CORRECT — let ErrorHandler middleware format the response
+appError := domainError.NewAppError(err, domainError.ValidationError)
+_ = ctx.Error(appError)
+return
+
+// ✅ CORRECT — pass errors from service layer directly
+dMed, err := c.medicineService.Create(&newMed)
+if err != nil {
+    _ = ctx.Error(err)
+    return
+}
+
+// ❌ WRONG — do not manually JSON error responses
+ctx.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+```
+
+### In Repositories — wrap DB errors as AppError
+```go
+// ✅ CORRECT
+if err == gorm.ErrRecordNotFound {
+    return nil, domainErrors.NewAppErrorWithType(domainErrors.NotFound)
+}
+return nil, domainErrors.NewAppErrorWithType(domainErrors.UnknownError)
+
+// For duplicate key errors (GORM)
+byteErr, _ := json.Marshal(tx.Error)
+var newError domainErrors.GormErr
+json.Unmarshal(byteErr, &newError)
+switch newError.Number {
+case 1062:
+    return nil, domainErrors.NewAppErrorWithType(domainErrors.ResourceAlreadyExists)
+}
+```
+
+## Structured Logging with Zap
+
+Every layer receives `*logger.Logger` via constructor injection. NEVER use `fmt.Println` or `log`.
+
+### Correct Usage
+```go
+// Info with structured fields
+s.Logger.Info("Creating new medicine", zap.String("name", medicine.Name))
+s.Logger.Info("Successfully retrieved all medicines", zap.Int("count", len(*medicines)))
+
+// Error with cause
+s.Logger.Error("Error creating medicine", zap.Error(tx.Error), zap.String("name", newMedicine.Name))
+
+// Warning
+r.Logger.Warn("Medicine not found", zap.Int("id", id))
+
+// Multiple fields
+s.Logger.Info("Searching medicines with pagination",
+    zap.Int("page", filters.Page),
+    zap.Int("pageSize", filters.PageSize))
+```
+
+### Wrong Usage
+```go
+// ❌ NEVER do this
+fmt.Println("creating medicine")
+log.Printf("error: %v", err)
+s.Logger.Info(fmt.Sprintf("Creating medicine %s", name))  // waste of string formatting
+```
+
+### Log at Each Layer
+- **Controller**: Log request start, validation errors, success with result IDs
+- **Use Case**: Log operation start with key params
+- **Repository**: Log DB operations, warnings for not-found, errors with details

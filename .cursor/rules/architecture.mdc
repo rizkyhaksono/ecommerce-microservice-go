@@ -1,0 +1,87 @@
+---
+description: "Project architecture: Clean Architecture with Go, Gin-Gonic, GORM, PostgreSQL"
+alwaysApply: true
+---
+
+# Project Architecture — Ecommerce Microservice Go
+
+## Overview
+
+- **Module**: `github.com/gbrayhan/microservices-go`
+- **Go Version**: 1.24.2+
+- **Entry Point**: `main.go` (root directory, NOT `src/main.go`)
+- **Framework**: Gin-Gonic (HTTP router), GORM (ORM), Zap (structured logging)
+- **Database**: PostgreSQL
+- **Auth**: JWT with access + refresh tokens (HS256)
+- **Testing**: testify + go-sqlmock + godog/cucumber
+
+## Clean Architecture Layers
+
+```
+main.go                              ← Application entry point
+src/
+├── domain/                          ← INNERMOST — NO external dependencies
+│   ├── Types.go                     ← Shared types (DataFilters, SortDirection)
+│   ├── errors/                      ← AppError with typed errors + HTTP mapping
+│   │   ├── Errors.go                ← ErrorType constants, NewAppError(), AppErrorToHTTP()
+│   │   └── Gorm.go                  ← GormErr for DB error parsing
+│   ├── user/                        ← User entity + IUserService interface
+│   │   └── user.go
+│   └── medicine/                    ← Medicine entity + IMedicineService interface
+│       └── Medicine.go
+├── application/                     ← MIDDLE — depends only on domain
+│   └── usecases/
+│       ├── auth/auth.go             ← IAuthUseCase + AuthUseCase
+│       ├── user/user.go             ← IUserUseCase + UserUseCase
+│       └── medicine/medicine.go     ← IMedicineUseCase + MedicineUseCase
+└── infrastructure/                  ← OUTERMOST — depends on domain + application
+    ├── di/                          ← ApplicationContext (dependency wiring)
+    │   └── application_context.go
+    ├── repository/psql/             ← PostgreSQL repositories via GORM
+    │   ├── psql_repository.go       ← DB connection setup
+    │   ├── user/user.go             ← UserRepositoryInterface + Repository
+    │   └── medicine/medicine.go     ← MedicineRepositoryInterface + Repository
+    ├── rest/
+    │   ├── controllers/             ← HTTP controllers per entity
+    │   │   ├── BindTools.go         ← BindJSON, BindJSONMap helpers
+    │   │   ├── auth/Auth.go
+    │   │   ├── user/User.go
+    │   │   └── medicine/Medicines.go
+    │   ├── middlewares/             ← Auth JWT, error handler, CORS, logging
+    │   └── routes/                  ← Per-entity route registration under /v1
+    │       ├── routes.go            ← ApplicationRouter (main router)
+    │       ├── auth.go
+    │       ├── user.go
+    │       └── medicine.go
+    ├── security/                    ← JWT service (IJWTService)
+    │   └── jwt_service.go
+    └── logger/                      ← Zap structured logger wrapper
+Test/                                ← Integration tests (CAPITAL T)
+└── integration/
+```
+
+## Critical Dependency Rules
+
+```
+infrastructure ──→ application ──→ domain
+     ↑                  ↑              ↑
+  outermost          middle        innermost
+```
+
+1. **Domain NEVER imports** application or infrastructure packages
+2. **Application NEVER imports** infrastructure packages (except repository interfaces defined in infrastructure)
+3. **Infrastructure** can import everything
+4. Dependencies ALWAYS point INWARD
+
+## Dependency Injection Flow
+
+All wiring happens in `src/infrastructure/di/application_context.go`:
+
+```
+DB (GORM) → Repositories → Use Cases → Controllers → Routes
+                    ↑               ↑             ↑
+              Logger injected into every layer
+```
+
+Production: `SetupDependencies(logger) → *ApplicationContext`
+Testing: `NewTestApplicationContext(mockRepos, mockJWT, logger) → *ApplicationContext`

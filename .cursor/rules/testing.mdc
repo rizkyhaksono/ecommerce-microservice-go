@@ -1,0 +1,118 @@
+---
+description: "Testing patterns: unit tests, integration tests, mocking, test DI"
+globs: "**/*_test.go,Test/**"
+---
+
+# Testing Patterns
+
+## Test Stack
+- **testify**: assertions (`assert`, `require`) and mocks (`mock.Mock`)
+- **go-sqlmock**: GORM/SQL database mocking
+- **godog/cucumber**: BDD integration tests in `Test/integration/`
+
+## Unit Test Structure (Arrange-Act-Assert)
+
+```go
+func TestGetByID_Success(t *testing.T) {
+    // Arrange
+    mockRepo := new(MockRepository)
+    log, _ := logger.NewDevelopmentLogger()
+    uc := NewUseCase(mockRepo, log)
+
+    expected := &domain.Entity{ID: 1, Name: "test"}
+    mockRepo.On("GetByID", 1).Return(expected, nil)
+
+    // Act
+    result, err := uc.GetByID(1)
+
+    // Assert
+    assert.NoError(t, err)
+    assert.Equal(t, expected, result)
+    mockRepo.AssertExpectations(t)
+}
+
+func TestGetByID_NotFound(t *testing.T) {
+    // Arrange
+    mockRepo := new(MockRepository)
+    log, _ := logger.NewDevelopmentLogger()
+    uc := NewUseCase(mockRepo, log)
+
+    mockRepo.On("GetByID", 999).Return(nil, domainErrors.NewAppErrorWithType(domainErrors.NotFound))
+
+    // Act
+    result, err := uc.GetByID(999)
+
+    // Assert
+    assert.Nil(t, result)
+    assert.Error(t, err)
+    var appErr *domainErrors.AppError
+    assert.True(t, errors.As(err, &appErr))
+    assert.Equal(t, domainErrors.NotFound, appErr.Type)
+}
+```
+
+## Controller Testing with Gin
+
+```go
+func TestNewMedicine_Success(t *testing.T) {
+    gin.SetMode(gin.TestMode)
+    w := httptest.NewRecorder()
+    ctx, _ := gin.CreateTestContext(w)
+
+    body := `{"name":"test","description":"desc","laboratory":"lab","eanCode":"123"}`
+    ctx.Request = httptest.NewRequest("POST", "/", strings.NewReader(body))
+    ctx.Request.Header.Set("Content-Type", "application/json")
+
+    // ... setup mock service, call controller, assert response
+    assert.Equal(t, http.StatusOK, w.Code)
+}
+```
+
+## Repository Testing with sqlmock
+
+```go
+func TestCreate_Success(t *testing.T) {
+    db, mock, _ := sqlmock.New()
+    gormDB, _ := gorm.Open(postgres.New(postgres.Config{Conn: db}), &gorm.Config{})
+    log, _ := logger.NewDevelopmentLogger()
+    repo := NewRepository(gormDB, log)
+
+    mock.ExpectBegin()
+    mock.ExpectQuery(`INSERT INTO "medicines"`).WillReturnRows(
+        sqlmock.NewRows([]string{"id"}).AddRow(1),
+    )
+    mock.ExpectCommit()
+
+    result, err := repo.Create(&domain.Medicine{Name: "test"})
+    assert.NoError(t, err)
+    assert.NotNil(t, result)
+    assert.NoError(t, mock.ExpectationsWereMet())
+}
+```
+
+## Test DI — ApplicationContext for Testing
+
+```go
+appCtx := di.NewTestApplicationContext(
+    mockUserRepo,
+    mockMedicineRepo,
+    mockJWTService,
+    loggerInstance,
+)
+```
+
+## Running Tests
+
+```bash
+make tests                          # All tests: go test -v ./Test/...
+make tests-TestGetByID_Success      # Specific test
+make integration-test               # Integration tests via script
+go test -v -coverprofile=c.out ./...  # With coverage
+go tool cover -html=c.out           # View coverage
+```
+
+## Test Conventions
+- Test files: `<source>_test.go` alongside source
+- Test function names: `Test<Method>_<Scenario>` (e.g., `TestCreate_DuplicateError`)
+- Always test: success case, not-found, validation error, repository error
+- Target coverage: ≥ 80%

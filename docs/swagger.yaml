@@ -1,0 +1,1026 @@
+basePath: /v1
+definitions:
+  auth.AccessTokenRequest:
+    properties:
+      refreshToken:
+        type: string
+    required:
+    - refreshToken
+    type: object
+  auth.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  auth.LoginResponse:
+    properties:
+      data:
+        $ref: '#/definitions/auth.UserData'
+      security:
+        $ref: '#/definitions/auth.SecurityData'
+    type: object
+  auth.SecurityData:
+    properties:
+      expirationAccessDateTime:
+        type: string
+      expirationRefreshDateTime:
+        type: string
+      jwtAccessToken:
+        type: string
+      jwtRefreshToken:
+        type: string
+    type: object
+  auth.UserData:
+    properties:
+      email:
+        type: string
+      firstName:
+        type: string
+      id:
+        type: integer
+      lastName:
+        type: string
+      status:
+        type: boolean
+      userName:
+        type: string
+    type: object
+  category.NewCategoryRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      slug:
+        type: string
+    required:
+    - name
+    - slug
+    type: object
+  category.ResponseCategory:
+    properties:
+      createdAt:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      slug:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  controllers.MessageResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  order.NewOrderRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/order.OrderItemRequest'
+        type: array
+      shippingAddress:
+        type: string
+    required:
+    - items
+    - shippingAddress
+    type: object
+  order.OrderItemRequest:
+    properties:
+      price:
+        type: number
+      productId:
+        type: integer
+      quantity:
+        type: integer
+    required:
+    - price
+    - productId
+    - quantity
+    type: object
+  order.ResponseOrder:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/order.ResponseOrderItem'
+        type: array
+      shippingAddress:
+        type: string
+      status:
+        type: string
+      totalAmount:
+        type: number
+      updatedAt:
+        type: string
+      userId:
+        type: integer
+    type: object
+  order.ResponseOrderItem:
+    properties:
+      id:
+        type: integer
+      price:
+        type: number
+      productId:
+        type: integer
+      quantity:
+        type: integer
+      subtotal:
+        type: number
+    type: object
+  order.UpdateStatusRequest:
+    properties:
+      status:
+        type: string
+    required:
+    - status
+    type: object
+  product.NewProductRequest:
+    properties:
+      categoryId:
+        type: integer
+      description:
+        type: string
+      imageUrl:
+        type: string
+      isActive:
+        type: boolean
+      name:
+        type: string
+      price:
+        type: number
+      sku:
+        type: string
+      stock:
+        type: integer
+    required:
+    - categoryId
+    - name
+    - price
+    - sku
+    type: object
+  product.ResponseProduct:
+    properties:
+      categoryId:
+        type: integer
+      createdAt:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      imageUrl:
+        type: string
+      isActive:
+        type: boolean
+      name:
+        type: string
+      price:
+        type: number
+      sku:
+        type: string
+      stock:
+        type: integer
+      updatedAt:
+        type: string
+    type: object
+  user.NewUserRequest:
+    properties:
+      email:
+        type: string
+      firstName:
+        type: string
+      lastName:
+        type: string
+      password:
+        type: string
+      role:
+        type: string
+      user:
+        type: string
+    required:
+    - email
+    - firstName
+    - lastName
+    - password
+    - role
+    - user
+    type: object
+  user.ResponseUser:
+    properties:
+      createdAt:
+        type: string
+      email:
+        type: string
+      firstName:
+        type: string
+      id:
+        type: integer
+      lastName:
+        type: string
+      status:
+        type: boolean
+      updatedAt:
+        type: string
+      user:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: A production-ready microservices boilerplate built with Go, implementing
+    Clean Architecture principles.
+  title: Ecommerce Microservice API
+  version: 2.0.0
+paths:
+  /auth/access-token:
+    post:
+      consumes:
+      - application/json
+      description: Get a new access token using a valid refresh token
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.AccessTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      summary: Refresh access token
+      tags:
+      - Auth
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with email and password, returns JWT tokens
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      summary: User login
+      tags:
+      - Auth
+  /category/:
+    get:
+      description: Retrieve a list of all product categories
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/category.ResponseCategory'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      summary: Get all categories
+      tags:
+      - Category
+    post:
+      consumes:
+      - application/json
+      description: Create a new product category
+      parameters:
+      - description: Category details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/category.NewCategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/category.ResponseCategory'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new category
+      tags:
+      - Category
+  /category/{id}:
+    delete:
+      description: Delete a category by ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a category
+      tags:
+      - Category
+    get:
+      description: Retrieve a single category by its ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/category.ResponseCategory'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      summary: Get category by ID
+      tags:
+      - Category
+    put:
+      consumes:
+      - application/json
+      description: Update category fields by ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to update
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/category.ResponseCategory'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a category
+      tags:
+      - Category
+  /order/:
+    get:
+      description: Retrieve all orders for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/order.ResponseOrder'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current user's orders
+      tags:
+      - Order
+    post:
+      consumes:
+      - application/json
+      description: Create a new order with items. UserID is extracted from the JWT
+        token.
+      parameters:
+      - description: Order details with items
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/order.NewOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/order.ResponseOrder'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new order
+      tags:
+      - Order
+  /order/{id}:
+    get:
+      description: Retrieve a single order with its items by ID
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/order.ResponseOrder'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Get order by ID
+      tags:
+      - Order
+  /order/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: Update the status of an order (pending, paid, shipped, delivered,
+        cancelled)
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: New status
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/order.UpdateStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/order.ResponseOrder'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Update order status
+      tags:
+      - Order
+  /product/:
+    get:
+      description: Retrieve a list of all active products
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/product.ResponseProduct'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      summary: Get all products
+      tags:
+      - Product
+    post:
+      consumes:
+      - application/json
+      description: Create a new product listing
+      parameters:
+      - description: Product details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/product.NewProductRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/product.ResponseProduct'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new product
+      tags:
+      - Product
+  /product/{id}:
+    delete:
+      description: Delete a product by ID
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a product
+      tags:
+      - Product
+    get:
+      description: Retrieve a single product by its ID
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/product.ResponseProduct'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      summary: Get product by ID
+      tags:
+      - Product
+    put:
+      consumes:
+      - application/json
+      description: Update product fields by ID
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to update
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/product.ResponseProduct'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a product
+      tags:
+      - Product
+  /product/category/{categoryId}:
+    get:
+      description: Retrieve all active products belonging to a specific category
+      parameters:
+      - description: Category ID
+        in: path
+        name: categoryId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/product.ResponseProduct'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      summary: Get products by category
+      tags:
+      - Product
+  /user/:
+    get:
+      description: Retrieve a list of all users
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/user.ResponseUser'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all users
+      tags:
+      - User
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account with the provided details
+      parameters:
+      - description: User details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/user.NewUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user.ResponseUser'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new user
+      tags:
+      - User
+  /user/{id}:
+    delete:
+      description: Delete a user by ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a user
+      tags:
+      - User
+    get:
+      description: Retrieve a single user by their ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user.ResponseUser'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user by ID
+      tags:
+      - User
+    put:
+      consumes:
+      - application/json
+      description: Update user fields by ID (partial update supported)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to update
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user.ResponseUser'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a user
+      tags:
+      - User
+  /user/search:
+    get:
+      description: Search users with filters, sorting, and pagination support
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: pageSize
+        type: integer
+      - collectionFormat: csv
+        description: Sort by fields
+        in: query
+        items:
+          type: string
+        name: sortBy
+        type: array
+      - default: asc
+        description: Sort direction (asc/desc)
+        in: query
+        name: sortDirection
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Search users with pagination
+      tags:
+      - User
+  /user/search-property:
+    get:
+      description: Search users by a specific property and search text
+      parameters:
+      - description: Property to search by (userName, email, firstName, lastName,
+          status)
+        in: query
+        name: property
+        required: true
+        type: string
+      - description: Text to search for
+        in: query
+        name: searchText
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/user.ResponseUser'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Search users by property
+      tags:
+      - User
+securityDefinitions:
+  BearerAuth:
+    description: Enter "Bearer {token}" (with quotes removed)
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

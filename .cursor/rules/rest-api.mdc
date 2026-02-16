@@ -1,0 +1,130 @@
+---
+description: "REST API patterns: controllers, routes, middleware, request/response handling"
+globs: "**/rest/**,**/controllers/**,**/routes/**,**/middlewares/**"
+---
+
+# REST API Patterns
+
+## Controller Structure
+
+```go
+// 1. Request/Response structs at top
+type NewEntityRequest struct {
+    Name string `json:"name" binding:"required"`
+}
+type ResponseEntity struct {
+    ID   int    `json:"id"`
+    Name string `json:"name"`
+}
+
+// 2. Controller interface
+type IEntityController interface {
+    Create(ctx *gin.Context)
+    GetAll(ctx *gin.Context)
+    GetByID(ctx *gin.Context)
+    Update(ctx *gin.Context)
+    Delete(ctx *gin.Context)
+    SearchPaginated(ctx *gin.Context)
+    SearchByProperty(ctx *gin.Context)
+}
+
+// 3. Controller struct with service + logger
+type Controller struct {
+    service entityDomain.IEntityService
+    Logger  *logger.Logger
+}
+
+// 4. Constructor returning interface
+func NewEntityController(svc entityDomain.IEntityService, log *logger.Logger) IEntityController {
+    return &Controller{service: svc, Logger: log}
+}
+```
+
+## Handler Pattern
+
+```go
+func (c *Controller) Create(ctx *gin.Context) {
+    c.Logger.Info("Creating entity")
+
+    // 1. Bind and validate request
+    var req NewEntityRequest
+    if err := controllers.BindJSON(ctx, &req); err != nil {
+        c.Logger.Error("Bind error", zap.Error(err))
+        _ = ctx.Error(domainError.NewAppError(err, domainError.ValidationError))
+        return
+    }
+
+    // 2. Map request → domain entity
+    entity := domain.Entity{Name: req.Name}
+
+    // 3. Call service
+    result, err := c.service.Create(&entity)
+    if err != nil {
+        c.Logger.Error("Service error", zap.Error(err))
+        _ = ctx.Error(err)
+        return
+    }
+
+    // 4. Map domain → response
+    resp := domainToResponseMapper(result)
+    c.Logger.Info("Created successfully", zap.Int("id", result.ID))
+    ctx.JSON(http.StatusOK, resp)
+}
+```
+
+## Request Binding
+
+```go
+// Struct binding with validation
+controllers.BindJSON(ctx, &request)
+
+// Map binding for partial updates (PATCH/PUT with dynamic fields)
+controllers.BindJSONMap(ctx, &requestMap)
+```
+
+## ID Parameter Parsing
+
+```go
+id, err := strconv.Atoi(ctx.Param("id"))
+if err != nil {
+    appError := domainError.NewAppError(errors.New("id is invalid"), domainError.ValidationError)
+    _ = ctx.Error(appError)
+    return
+}
+```
+
+## Pagination Query Params
+
+```go
+page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+pageSize, _ := strconv.Atoi(ctx.DefaultQuery("pageSize", "10"))
+```
+
+## Route Registration
+
+```go
+func EntityRoutes(router *gin.RouterGroup, controller entity.IEntityController) {
+    group := router.Group("/entity")
+    group.Use(middlewares.AuthJWTMiddleware())
+    {
+        group.GET("/", controller.GetAll)
+        group.POST("/", controller.Create)
+        group.GET("/:id", controller.GetByID)
+        group.PUT("/:id", controller.Update)
+        group.DELETE("/:id", controller.Delete)
+        group.GET("/search", controller.SearchPaginated)
+        group.GET("/search-property", controller.SearchByProperty)
+    }
+}
+```
+
+## Success Responses
+- Single entity: `ctx.JSON(http.StatusOK, responseStruct)`
+- List: `ctx.JSON(http.StatusOK, arrayDomainToResponseMapper(data))`
+- Delete: `ctx.JSON(http.StatusOK, gin.H{"message": "resource deleted successfully"})`
+- Paginated: `ctx.JSON(http.StatusOK, gin.H{"data": ..., "total": ..., "page": ..., ...})`
+
+## DO NOT
+- Do NOT return domain entities directly, always map to response structs
+- Do NOT manually format error responses, use `ctx.Error()` + ErrorHandler middleware
+- Do NOT put business logic (validation beyond format, calculations, etc.) in controllers

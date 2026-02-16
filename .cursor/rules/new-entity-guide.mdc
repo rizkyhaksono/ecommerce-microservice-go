@@ -1,0 +1,88 @@
+---
+description: "Patterns for adding new entities/features: domain, use case, repository, controller, routes, DI"
+alwaysApply: true
+---
+
+# Adding New Entities / Features
+
+When adding a new entity (e.g., `order`, `product`, `category`), follow this exact checklist:
+
+## File Structure to Create
+
+```
+src/domain/<entity>/
+├── <entity>.go                    # Entity struct + IService interface
+└── <entity>_test.go               # Domain logic tests
+
+src/application/usecases/<entity>/
+├── <entity>.go                    # IUseCase interface + UseCase struct + NewUseCase()
+└── <entity>_test.go               # Use case tests (mock repo)
+
+src/infrastructure/repository/psql/<entity>/
+├── <entity>.go                    # GORM model + RepoInterface + Repository + mappers
+└── <entity>_test.go               # Repository tests (sqlmock)
+
+src/infrastructure/rest/controllers/<entity>/
+├── <Entity>.go                    # Controller + request/response structs + mappers
+├── <Entity>_test.go               # Controller tests
+└── Validation.go                  # Update validation logic
+
+src/infrastructure/rest/routes/
+└── <entity>.go                    # Route group registration
+```
+
+## Step-by-Step
+
+### 1. Domain Entity (`src/domain/<entity>/<entity>.go`)
+- Define entity struct (plain Go struct, NO GORM tags, NO JSON tags)
+- Define `SearchResult<Entity>` struct for pagination
+- Define `I<Entity>Service` interface with CRUD + search methods
+- NO imports from application or infrastructure
+
+### 2. Use Case (`src/application/usecases/<entity>/<entity>.go`)
+- Define `I<Entity>UseCase` interface
+- Create `<Entity>UseCase` struct with repository + logger fields
+- `New<Entity>UseCase()` constructor returning `I<Entity>UseCase`
+- Each method logs operation start, delegates to repository
+
+### 3. Repository (`src/infrastructure/repository/psql/<entity>/<entity>.go`)
+- Define `<Entity>RepositoryInterface` interface
+- Create GORM model struct with tags (`gorm:"primaryKey"`, etc.)
+- Implement `TableName()` method
+- Create `Columns<Entity>Mapping` for safe column resolution
+- Create `Repository` struct with `*gorm.DB` + `*logger.Logger`
+- `New<Entity>Repository()` returning interface
+- Implement `toDomainMapper()` and `arrayToDomainMapper()`
+- Wrap all DB errors as `AppError`
+
+### 4. Controller (`src/infrastructure/rest/controllers/<entity>/<Entity>.go`)
+- Define request structs with `json` + `binding` tags
+- Define response structs with `json` tags
+- Define `I<Entity>Controller` interface
+- Create `Controller` struct with service + logger
+- `New<Entity>Controller()` returning interface
+- Implement handlers: BindJSON → validate → call service → map → respond
+- Create `domainToResponseMapper()` and `arrayDomainToResponseMapper()`
+
+### 5. Validation (`src/infrastructure/rest/controllers/<entity>/Validation.go`)
+- `updateValidation(requestMap map[string]any) error`
+- Check allowed fields, return `AppError` for invalid ones
+
+### 6. Routes (`src/infrastructure/rest/routes/<entity>.go`)
+- `<Entity>Routes(router *gin.RouterGroup, controller <entity>.I<Entity>Controller)`
+- Group under `/<entity>`, apply `AuthJWTMiddleware()` if auth required
+- Register GET, POST, PUT, DELETE, search endpoints
+
+### 7. Wire in DI (`src/infrastructure/di/application_context.go`)
+- Add fields: `<Entity>Controller`, `<Entity>Repository`, `<Entity>UseCase`
+- In `SetupDependencies()`: create repo → create use case → create controller
+- In `NewTestApplicationContext()`: accept mock repo, wire same pattern
+- In `routes.go`: call `<Entity>Routes(v1, appContext.<Entity>Controller)`
+
+## Database Migration
+
+```bash
+make migration-<entity>
+# Then edit the generated .up.sql and .down.sql files
+make migrate-up
+```

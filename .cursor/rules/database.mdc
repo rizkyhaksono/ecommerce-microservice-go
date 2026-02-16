@@ -1,0 +1,136 @@
+---
+description: "Database and GORM patterns: models, column mapping, pagination, migrations"
+globs: "**/repository/**,**/psql/**"
+---
+
+# Database & GORM Patterns
+
+## GORM Model Structure
+
+```go
+type Medicine struct {
+    ID          int       `gorm:"primaryKey"`
+    Name        string    `gorm:"unique"`
+    Description string
+    EANCode     string    `gorm:"unique"`
+    Laboratory  string
+    CreatedAt   time.Time `gorm:"autoCreateTime:milli"`
+    UpdatedAt   time.Time `gorm:"autoUpdateTime:milli"`
+}
+
+// ALWAYS explicit table name
+func (*Medicine) TableName() string {
+    return "medicines"
+}
+```
+
+## Column Mapping (REQUIRED for dynamic queries)
+
+Every entity MUST have a column mapping variable to prevent SQL injection:
+
+```go
+var ColumnsMedicineMapping = map[string]string{
+    "id":          "id",
+    "name":        "name",
+    "description": "description",
+    "eanCode":     "ean_code",     // camelCase key → snake_case column
+    "laboratory":  "laboratory",
+    "createdAt":   "created_at",
+    "updatedAt":   "updated_at",
+}
+```
+
+Usage:
+```go
+// ✅ CORRECT — resolve via mapping
+column := ColumnsMapping[field]
+if column != "" {
+    query = query.Where(column+" ILIKE ?", "%"+value+"%")
+}
+
+// ❌ WRONG — direct user input in query
+query = query.Where(field+" ILIKE ?", "%"+value+"%")
+```
+
+## Mappers Between Layers
+
+```go
+// GORM model → Domain entity (in repository)
+func (m *Medicine) toDomainMapper() *domainMedicine.Medicine {
+    return &domainMedicine.Medicine{
+        ID:          m.ID,
+        Name:        m.Name,
+        Description: m.Description,
+        EanCode:     m.EANCode,  // note: field name may differ
+        Laboratory:  m.Laboratory,
+        CreatedAt:   m.CreatedAt,
+        UpdatedAt:   m.UpdatedAt,
+    }
+}
+
+func arrayToDomainMapper(models *[]Medicine) *[]domainMedicine.Medicine {
+    result := make([]domainMedicine.Medicine, len(*models))
+    for i, m := range *models {
+        result[i] = *m.toDomainMapper()
+    }
+    return &result
+}
+```
+
+## SearchPaginated Pattern
+
+```go
+func (r *Repository) SearchPaginated(filters domain.DataFilters) (*SearchResult, error) {
+    query := r.DB.Model(&Model{})
+
+    // 1. Apply LIKE filters
+    for field, values := range filters.LikeFilters {
+        column := ColumnsMapping[field]
+        if column != "" {
+            for _, v := range values {
+                query = query.Where(column+" ILIKE ?", "%"+v+"%")
+            }
+        }
+    }
+
+    // 2. Apply exact matches
+    for field, values := range filters.Matches {
+        column := ColumnsMapping[field]
+        if column != "" {
+            query = query.Where(column+" IN ?", values)
+        }
+    }
+
+    // 3. Apply date range filters
+    // 4. Apply sorting
+    // 5. Count total (clone query before pagination)
+    // 6. Apply offset/limit
+    // 7. Return SearchResult with totalPages calculation
+}
+```
+
+## Error Wrapping
+
+```go
+// Not found
+if err == gorm.ErrRecordNotFound {
+    return nil, domainErrors.NewAppErrorWithType(domainErrors.NotFound)
+}
+
+// Duplicate key
+byteErr, _ := json.Marshal(tx.Error)
+var gormErr domainErrors.GormErr
+json.Unmarshal(byteErr, &gormErr)
+if gormErr.Number == 1062 {
+    return nil, domainErrors.NewAppErrorWithType(domainErrors.ResourceAlreadyExists)
+}
+
+// Generic
+return nil, domainErrors.NewAppErrorWithType(domainErrors.UnknownError)
+```
+
+## Connection Setup
+
+Database connection is initialized in `src/infrastructure/repository/psql/psql_repository.go` via `InitPSQLDB(logger)`.
+Uses environment variables: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSLMODE`.
+Connection pool config: `DB_MAX_IDLE_CONNS`, `DB_MAX_OPEN_CONNS`, `DB_CONN_MAX_LIFETIME`.

@@ -68,11 +68,18 @@ services:
       JWT_REFRESH_TIME_HOUR: "24"
       START_USER_EMAIL: ${START_USER_EMAIL:-admin@example.com}
       START_USER_PW: ${START_USER_PW:-admin123}
+      OTEL_SERVICE_NAME: user-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=development,service.namespace=ecommerce
     ports:
       - "9091:9091"
     depends_on:
       user-db:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     restart: unless-stopped
 
   catalog-service:
@@ -89,11 +96,18 @@ services:
       DB_NAME: catalog_db
       DB_SSLMODE: disable
       JWT_ACCESS_SECRET_KEY: ${JWT_ACCESS_SECRET_KEY:-super-secret-access-key}
+      OTEL_SERVICE_NAME: catalog-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=development,service.namespace=ecommerce
     ports:
       - "9092:9092"
     depends_on:
       catalog-db:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     restart: unless-stopped
 
   order-service:
@@ -110,11 +124,18 @@ services:
       DB_NAME: order_db
       DB_SSLMODE: disable
       JWT_ACCESS_SECRET_KEY: ${JWT_ACCESS_SECRET_KEY:-super-secret-access-key}
+      OTEL_SERVICE_NAME: order-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=development,service.namespace=ecommerce
     ports:
       - "9093:9093"
     depends_on:
       order-db:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     restart: unless-stopped
 
   gateway:
@@ -127,15 +148,89 @@ services:
       USER_SERVICE_URL: http://user-service:9091
       CATALOG_SERVICE_URL: http://catalog-service:9092
       ORDER_SERVICE_URL: http://order-service:9093
+      OTEL_SERVICE_NAME: gateway
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=development,service.namespace=ecommerce
     ports:
       - "9090:9090"
     depends_on:
       - user-service
       - catalog-service
       - order-service
+      - otel-collector
+    restart: unless-stopped
+
+  # ─── Observability stack (OpenTelemetry + Grafana LGTM) ──
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.123.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC (from apps)
+      - "4318:4318"   # OTLP HTTP (optional)
+      - "8889:8889"   # Prometheus scrape endpoint (app metrics)
+    depends_on:
+      - tempo
+      - loki
+      - prometheus
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo:2.7.0
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200"   # Tempo HTTP API (queried by Grafana)
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.4.2
+    command: ["-config.file=/etc/loki/loki-config.yaml"]
+    volumes:
+      - ./observability/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9099:9090"   # HOST 9099 -> container 9090 (gateway already owns host 9090)
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - tempo
+      - loki
+      - prometheus
     restart: unless-stopped
 
 volumes:
   user_data:
   catalog_data:
   order_data:
+  tempo_data:
+  loki_data:
+  prometheus_data:
+  grafana_data:

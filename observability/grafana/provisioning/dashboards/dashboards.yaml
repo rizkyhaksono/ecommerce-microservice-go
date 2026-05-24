@@ -1,0 +1,13 @@
+# Auto-loads every *.json in this directory as a Grafana dashboard.
+apiVersion: 1
+providers:
+  - name: ecommerce-observability
+    orgId: 1
+    folder: Ecommerce Observability
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

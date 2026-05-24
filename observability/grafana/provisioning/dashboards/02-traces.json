@@ -1,0 +1,40 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "tags": ["ecommerce", "traces", "tempo", "opentelemetry"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Traces (Tempo / OpenTelemetry)",
+  "uid": "ecom-traces",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "How to use",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "Tabel di bawah menampilkan trace terbaru (TraceQL `{}`). **Klik baris trace** untuk membuka waterfall span (gateway → service → query DB). Dari sebuah span, gunakan **Logs for this span** untuk loncat ke log Loki yang terkorelasi. Untuk pencarian lebih bebas, pakai menu **Explore → Tempo** dan tulis TraceQL, mis. `{ resource.service.name = \"user-service\" }` atau `{ duration > 100ms }`."
+      }
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Recent traces",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 18, "w": 24, "x": 0, "y": 4 },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "showHeader": true },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "tempo", "uid": "tempo" }, "queryType": "traceql", "query": "{}", "limit": 50, "tableType": "traces" }
+      ]
+    }
+  ]
+}

@@ -21,9 +21,13 @@ exporters:
     endpoint: tempo:4317
     tls:
       insecure: true
-  # Metrics -> exposed on :8889 for Prometheus to scrape
+  # Metrics -> exposed on :8889 for Prometheus to scrape.
+  # resource_to_telemetry_conversion promotes resource attributes (service.name,
+  # deployment.environment, ...) to metric labels so dashboards can filter per service.
   prometheus:
     endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: true
   # Logs -> Loki native OTLP endpoint (collector appends /v1/logs)
   otlphttp/loki:
     endpoint: http://loki:3100/otlp

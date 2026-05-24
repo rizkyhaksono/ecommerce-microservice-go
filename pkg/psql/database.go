@@ -11,6 +11,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
+	"gorm.io/plugin/opentelemetry/tracing"
 )
 
 type DatabaseConfig struct {
@@ -90,6 +91,12 @@ func ConnectDB(loggerInstance *logger.Logger) (*gorm.DB, error) {
 	})
 	if err != nil {
 		loggerInstance.Error("Error connecting to the database", zap.Error(err))
+		return nil, err
+	}
+
+	// Emit query spans + DB metrics via the global OTel providers (set by InitOTel).
+	if err := db.Use(tracing.NewPlugin()); err != nil {
+		loggerInstance.Error("Failed to register gorm otel plugin", zap.Error(err))
 		return nil, err
 	}
 

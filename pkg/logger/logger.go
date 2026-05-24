@@ -16,8 +16,10 @@ type Logger struct {
 	Log *zap.Logger
 }
 
-func NewLogger() (*Logger, error) {
-	encoderConfig := zapcore.EncoderConfig{
+// baseEncoderConfig is the shared JSON encoder config used by every logger
+// variant (stdout-only and the OTel tee).
+func baseEncoderConfig() zapcore.EncoderConfig {
+	return zapcore.EncoderConfig{
 		TimeKey:        "timestamp",
 		LevelKey:       "level",
 		NameKey:        "logger",
@@ -31,35 +33,23 @@ func NewLogger() (*Logger, error) {
 		EncodeCaller:   zapcore.FullCallerEncoder,
 		EncodeName:     zapcore.FullNameEncoder,
 	}
-	core := zapcore.NewCore(
-		zapcore.NewJSONEncoder(encoderConfig),
+}
+
+// stdoutCore builds the JSON-to-stdout core at the given level.
+func stdoutCore(level zapcore.Level) zapcore.Core {
+	return zapcore.NewCore(
+		zapcore.NewJSONEncoder(baseEncoderConfig()),
 		zapcore.AddSync(os.Stdout),
-		zap.NewAtomicLevelAt(zap.InfoLevel),
+		zap.NewAtomicLevelAt(level),
 	)
-	return &Logger{Log: zap.New(core)}, nil
+}
+
+func NewLogger() (*Logger, error) {
+	return &Logger{Log: zap.New(stdoutCore(zap.InfoLevel))}, nil
 }
 
 func NewDevelopmentLogger() (*Logger, error) {
-	encoderConfig := zapcore.EncoderConfig{
-		TimeKey:        "timestamp",
-		LevelKey:       "level",
-		NameKey:        "logger",
-		CallerKey:      "caller",
-		MessageKey:     "msg",
-		StacktraceKey:  "stacktrace",
-		LineEnding:     zapcore.DefaultLineEnding,
-		EncodeLevel:    zapcore.CapitalLevelEncoder,
-		EncodeTime:     zapcore.ISO8601TimeEncoder,
-		EncodeDuration: zapcore.StringDurationEncoder,
-		EncodeCaller:   zapcore.FullCallerEncoder,
-		EncodeName:     zapcore.FullNameEncoder,
-	}
-	core := zapcore.NewCore(
-		zapcore.NewJSONEncoder(encoderConfig),
-		zapcore.AddSync(os.Stdout),
-		zap.NewAtomicLevelAt(zap.DebugLevel),
-	)
-	return &Logger{Log: zap.New(core, zap.AddStacktrace(zap.ErrorLevel))}, nil
+	return &Logger{Log: zap.New(stdoutCore(zap.DebugLevel), zap.AddStacktrace(zap.ErrorLevel))}, nil
 }
 
 func (l *Logger) Info(msg string, fields ...zap.Field)  { l.Log.Info(msg, fields...) }
@@ -100,7 +90,9 @@ func (l *Logger) GinZapLogger() gin.HandlerFunc {
 		start := time.Now()
 		c.Next()
 		latency := time.Since(start)
-		l.Log.Info("HTTP request",
+		// Ctx adds trace_id/span_id from the span created by otelgin upstream,
+		// so access logs in Loki link back to the trace in Tempo.
+		l.Ctx(c.Request.Context()).Info("HTTP request",
 			zap.String("method", c.Request.Method),
 			zap.String("path", c.Request.URL.Path),
 			zap.Int("status", c.Writer.Status()),

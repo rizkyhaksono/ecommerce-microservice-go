@@ -13,16 +13,22 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
 	"time"
 
+	"ecommerce-microservice-go/pkg/logger"
+	"ecommerce-microservice-go/pkg/observability"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 type ServiceConfig struct {
@@ -32,8 +38,25 @@ type ServiceConfig struct {
 }
 
 func main() {
-	log := initLogger()
-	defer func() { _ = log.Sync() }()
+	env := getEnvOrDefault("GO_ENV", "development")
+	serviceName := getEnvOrDefault("OTEL_SERVICE_NAME", "gateway")
+
+	// OpenTelemetry: traces + metrics + logs over OTLP to the collector.
+	otelProviders, otelShutdown, err := observability.InitOTel(context.Background(), serviceName)
+	if err != nil {
+		panic(fmt.Errorf("error initializing OpenTelemetry: %w", err))
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = otelShutdown(ctx)
+	}()
+
+	log, err := logger.NewLoggerWithOTel(otelProviders.LoggerProvider, "ecommerce-microservice-go/services/gateway", env == "development")
+	if err != nil {
+		panic(fmt.Errorf("error initializing logger: %w", err))
+	}
+	defer func() { _ = log.Log.Sync() }()
 
 	log.Info("Starting API Gateway")
 
@@ -43,7 +66,6 @@ func main() {
 		OrderURL:   getEnvOrDefault("ORDER_SERVICE_URL", "http://localhost:9093"),
 	}
 
-	env := getEnvOrDefault("GO_ENV", "development")
 	if env == "development" {
 		gin.SetMode(gin.DebugMode)
 	} else {
@@ -51,6 +73,7 @@ func main() {
 	}
 
 	router := gin.New()
+	router.Use(otelgin.Middleware(serviceName)) // first: creates the request span/context
 	router.Use(gin.Recovery())
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
@@ -60,7 +83,7 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
-	router.Use(zapLoggerMiddleware(log))
+	router.Use(log.GinZapLogger())
 
 	// Root Handler
 	router.GET("/", func(c *gin.Context) {
@@ -91,18 +114,18 @@ func main() {
 	})
 
 	// User Service routes
-	userProxy := createReverseProxy(cfg.UserURL, log)
+	userProxy := createReverseProxy(cfg.UserURL, log.Log)
 	v1.Any("/auth/*path", proxyHandler(userProxy))
 	v1.Any("/user/*path", proxyHandler(userProxy))
 
 	// Catalog Service routes
-	catalogProxy := createReverseProxy(cfg.CatalogURL, log)
+	catalogProxy := createReverseProxy(cfg.CatalogURL, log.Log)
 	v1.Any("/category/*path", proxyHandler(catalogProxy))
 	v1.Any("/product/*path", proxyHandler(catalogProxy))
 	v1.Any("/catalog/*path", proxyHandler(catalogProxy))
 
 	// Order Service routes
-	orderProxy := createReverseProxy(cfg.OrderURL, log)
+	orderProxy := createReverseProxy(cfg.OrderURL, log.Log)
 	v1.Any("/order/*path", proxyHandler(orderProxy))
 
 	port := getEnvOrDefault("SERVER_PORT", "9090")
@@ -126,6 +149,9 @@ func createReverseProxy(target string, log *zap.Logger) *httputil.ReverseProxy {
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
+	// Inject W3C traceparent on the downstream call so the target service's
+	// otelgin middleware continues the same trace (gateway -> service).
+	proxy.Transport = otelhttp.NewTransport(http.DefaultTransport)
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		log.Error("Proxy error", zap.String("target", target), zap.String("path", r.URL.Path), zap.Error(err))
 		w.WriteHeader(http.StatusBadGateway)
@@ -141,44 +167,6 @@ func proxyHandler(proxy *httputil.ReverseProxy) gin.HandlerFunc {
 		// The reverse proxy target already has /v1 in its path
 		c.Request.URL.Path = "/v1" + c.Request.URL.Path[len("/v1"):]
 		proxy.ServeHTTP(c.Writer, c.Request)
-	}
-}
-
-func initLogger() *zap.Logger {
-	encoderConfig := zapcore.EncoderConfig{
-		TimeKey:        "timestamp",
-		LevelKey:       "level",
-		NameKey:        "logger",
-		CallerKey:      "caller",
-		MessageKey:     "msg",
-		StacktraceKey:  "stacktrace",
-		LineEnding:     zapcore.DefaultLineEnding,
-		EncodeLevel:    zapcore.CapitalLevelEncoder,
-		EncodeTime:     zapcore.ISO8601TimeEncoder,
-		EncodeDuration: zapcore.StringDurationEncoder,
-		EncodeCaller:   zapcore.ShortCallerEncoder,
-	}
-
-	core := zapcore.NewCore(
-		zapcore.NewJSONEncoder(encoderConfig),
-		zapcore.AddSync(os.Stdout),
-		zap.NewAtomicLevelAt(zap.InfoLevel),
-	)
-
-	return zap.New(core)
-}
-
-func zapLoggerMiddleware(log *zap.Logger) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		start := time.Now()
-		c.Next()
-		log.Info("HTTP request",
-			zap.String("method", c.Request.Method),
-			zap.String("path", c.Request.URL.Path),
-			zap.Int("status", c.Writer.Status()),
-			zap.Duration("latency", time.Since(start)),
-			zap.String("client_ip", c.ClientIP()),
-		)
 	}
 }
 

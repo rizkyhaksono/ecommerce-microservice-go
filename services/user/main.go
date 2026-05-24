@@ -13,6 +13,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -20,6 +21,7 @@ import (
 
 	"ecommerce-microservice-go/pkg/logger"
 	"ecommerce-microservice-go/pkg/middleware"
+	"ecommerce-microservice-go/pkg/observability"
 	"ecommerce-microservice-go/pkg/psql"
 	"ecommerce-microservice-go/pkg/security"
 	"ecommerce-microservice-go/services/user/handler"
@@ -30,6 +32,7 @@ import (
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.uber.org/zap"
 
 	_ "ecommerce-microservice-go/services/user/docs"
@@ -37,13 +40,20 @@ import (
 
 func main() {
 	env := getEnvOrDefault("GO_ENV", "development")
-	var log *logger.Logger
-	var err error
-	if env == "development" {
-		log, err = logger.NewDevelopmentLogger()
-	} else {
-		log, err = logger.NewLogger()
+	serviceName := getEnvOrDefault("OTEL_SERVICE_NAME", "user-service")
+
+	// OpenTelemetry: traces + metrics + logs over OTLP to the collector.
+	otelProviders, otelShutdown, err := observability.InitOTel(context.Background(), serviceName)
+	if err != nil {
+		panic(fmt.Errorf("error initializing OpenTelemetry: %w", err))
 	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = otelShutdown(ctx)
+	}()
+
+	log, err := logger.NewLoggerWithOTel(otelProviders.LoggerProvider, "ecommerce-microservice-go/services/user", env == "development")
 	if err != nil {
 		panic(fmt.Errorf("error initializing logger: %w", err))
 	}
@@ -82,6 +92,7 @@ func main() {
 	}
 
 	router := gin.New()
+	router.Use(otelgin.Middleware(serviceName)) // first: creates the request span/context
 	router.Use(gin.Recovery(), cors.Default())
 	router.Use(middleware.ErrorHandler())
 	router.Use(middleware.CommonHeaders)

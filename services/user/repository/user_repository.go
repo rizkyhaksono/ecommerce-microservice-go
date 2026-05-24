@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"time"
@@ -31,12 +32,12 @@ func (User) TableName() string {
 }
 
 type UserRepositoryInterface interface {
-	GetAll() (*[]userDomain.User, error)
-	GetByID(id int) (*userDomain.User, error)
-	GetByEmail(email string) (*userDomain.User, error)
-	Create(user *userDomain.User) (*userDomain.User, error)
-	Update(id int, userMap map[string]interface{}) (*userDomain.User, error)
-	Delete(id int) error
+	GetAll(ctx context.Context) (*[]userDomain.User, error)
+	GetByID(ctx context.Context, id int) (*userDomain.User, error)
+	GetByEmail(ctx context.Context, email string) (*userDomain.User, error)
+	Create(ctx context.Context, user *userDomain.User) (*userDomain.User, error)
+	Update(ctx context.Context, id int, userMap map[string]interface{}) (*userDomain.User, error)
+	Delete(ctx context.Context, id int) error
 }
 
 type Repository struct {
@@ -48,18 +49,18 @@ func NewUserRepository(db *gorm.DB, loggerInstance *logger.Logger) UserRepositor
 	return &Repository{DB: db, Logger: loggerInstance}
 }
 
-func (r *Repository) GetAll() (*[]userDomain.User, error) {
+func (r *Repository) GetAll(ctx context.Context) (*[]userDomain.User, error) {
 	var users []User
-	if err := r.DB.Find(&users).Error; err != nil {
+	if err := r.DB.WithContext(ctx).Find(&users).Error; err != nil {
 		r.Logger.Error("Error getting all users", zap.Error(err))
 		return nil, domainErrors.NewAppErrorWithType(domainErrors.UnknownError)
 	}
 	return arrayToDomainMapper(&users), nil
 }
 
-func (r *Repository) GetByID(id int) (*userDomain.User, error) {
+func (r *Repository) GetByID(ctx context.Context, id int) (*userDomain.User, error) {
 	var u User
-	err := r.DB.Where("id = ?", id).First(&u).Error
+	err := r.DB.WithContext(ctx).Where("id = ?", id).First(&u).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return &userDomain.User{}, domainErrors.NewAppErrorWithType(domainErrors.NotFound)
@@ -69,9 +70,9 @@ func (r *Repository) GetByID(id int) (*userDomain.User, error) {
 	return u.toDomainMapper(), nil
 }
 
-func (r *Repository) GetByEmail(email string) (*userDomain.User, error) {
+func (r *Repository) GetByEmail(ctx context.Context, email string) (*userDomain.User, error) {
 	var u User
-	err := r.DB.Where("email = ?", email).First(&u).Error
+	err := r.DB.WithContext(ctx).Where("email = ?", email).First(&u).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return &userDomain.User{}, domainErrors.NewAppErrorWithType(domainErrors.NotFound)
@@ -81,9 +82,9 @@ func (r *Repository) GetByEmail(email string) (*userDomain.User, error) {
 	return u.toDomainMapper(), nil
 }
 
-func (r *Repository) Create(uDomain *userDomain.User) (*userDomain.User, error) {
+func (r *Repository) Create(ctx context.Context, uDomain *userDomain.User) (*userDomain.User, error) {
 	u := fromDomainMapper(uDomain)
-	txResult := r.DB.Create(u)
+	txResult := r.DB.WithContext(ctx).Create(u)
 	if txResult.Error != nil {
 		byteErr, _ := json.Marshal(txResult.Error)
 		var newError domainErrors.GormErr
@@ -100,20 +101,20 @@ func (r *Repository) Create(uDomain *userDomain.User) (*userDomain.User, error) 
 	return u.toDomainMapper(), nil
 }
 
-func (r *Repository) Update(id int, userMap map[string]interface{}) (*userDomain.User, error) {
+func (r *Repository) Update(ctx context.Context, id int, userMap map[string]interface{}) (*userDomain.User, error) {
 	var u User
 	u.ID = id
-	if err := r.DB.Model(&u).Updates(userMap).Error; err != nil {
+	if err := r.DB.WithContext(ctx).Model(&u).Updates(userMap).Error; err != nil {
 		return &userDomain.User{}, domainErrors.NewAppErrorWithType(domainErrors.UnknownError)
 	}
-	if err := r.DB.Where("id = ?", id).First(&u).Error; err != nil {
+	if err := r.DB.WithContext(ctx).Where("id = ?", id).First(&u).Error; err != nil {
 		return &userDomain.User{}, domainErrors.NewAppErrorWithType(domainErrors.NotFound)
 	}
 	return u.toDomainMapper(), nil
 }
 
-func (r *Repository) Delete(id int) error {
-	tx := r.DB.Delete(&User{}, id)
+func (r *Repository) Delete(ctx context.Context, id int) error {
+	tx := r.DB.WithContext(ctx).Delete(&User{}, id)
 	if tx.Error != nil {
 		return domainErrors.NewAppErrorWithType(domainErrors.UnknownError)
 	}

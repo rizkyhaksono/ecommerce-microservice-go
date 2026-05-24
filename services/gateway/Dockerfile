@@ -1,5 +1,6 @@
 FROM golang:1.24-alpine AS builder
 WORKDIR /srv
+COPY pkg/ ./pkg/
 COPY services/gateway/ ./services/gateway/
 RUN cd services/gateway && go mod download && \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /srv/gateway .

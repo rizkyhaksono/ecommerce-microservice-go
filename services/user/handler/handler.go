@@ -95,7 +95,7 @@ func (h *Handler) Register(ctx *gin.Context) {
 		_ = ctx.Error(domainErrors.NewAppError(err, domainErrors.ValidationError))
 		return
 	}
-	u, err := h.userUseCase.Create(&userDomain.User{
+	u, err := h.userUseCase.Create(ctx.Request.Context(), &userDomain.User{
 		UserName: request.UserName, Email: request.Email,
 		FirstName: request.FirstName, LastName: request.LastName,
 		HashPassword: request.Password, Status: true, // Auto-active for registration
@@ -124,7 +124,7 @@ func (h *Handler) Login(ctx *gin.Context) {
 		_ = ctx.Error(domainErrors.NewAppError(err, domainErrors.ValidationError))
 		return
 	}
-	user, tokens, err := h.authUseCase.Login(request.Email, request.Password)
+	user, tokens, err := h.authUseCase.Login(ctx.Request.Context(), request.Email, request.Password)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -152,7 +152,7 @@ func (h *Handler) GetAccessTokenByRefreshToken(ctx *gin.Context) {
 		_ = ctx.Error(domainErrors.NewAppError(err, domainErrors.ValidationError))
 		return
 	}
-	user, tokens, err := h.authUseCase.AccessTokenByRefreshToken(request.RefreshToken)
+	user, tokens, err := h.authUseCase.AccessTokenByRefreshToken(ctx.Request.Context(), request.RefreshToken)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -182,7 +182,7 @@ func (h *Handler) NewUser(ctx *gin.Context) {
 		_ = ctx.Error(domainErrors.NewAppError(err, domainErrors.ValidationError))
 		return
 	}
-	u, err := h.userUseCase.Create(&userDomain.User{
+	u, err := h.userUseCase.Create(ctx.Request.Context(), &userDomain.User{
 		UserName: request.UserName, Email: request.Email,
 		FirstName: request.FirstName, LastName: request.LastName,
 		HashPassword: request.Password, Status: request.Status,
@@ -204,7 +204,7 @@ func (h *Handler) NewUser(ctx *gin.Context) {
 // @Failure      500 {object} controllers.MessageResponse
 // @Router       /user/ [get]
 func (h *Handler) GetAllUsers(ctx *gin.Context) {
-	users, err := h.userUseCase.GetAll()
+	users, err := h.userUseCase.GetAll(ctx.Request.Context())
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -229,7 +229,7 @@ func (h *Handler) GetUserByID(ctx *gin.Context) {
 		_ = ctx.Error(domainErrors.NewAppError(errors.New("invalid user id"), domainErrors.ValidationError))
 		return
 	}
-	u, err := h.userUseCase.GetByID(id)
+	u, err := h.userUseCase.GetByID(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -261,7 +261,7 @@ func (h *Handler) UpdateUser(ctx *gin.Context) {
 		_ = ctx.Error(domainErrors.NewAppError(err, domainErrors.ValidationError))
 		return
 	}
-	updated, err := h.userUseCase.Update(id, requestMap)
+	updated, err := h.userUseCase.Update(ctx.Request.Context(), id, requestMap)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -286,7 +286,7 @@ func (h *Handler) DeleteUser(ctx *gin.Context) {
 		_ = ctx.Error(domainErrors.NewAppError(errors.New("invalid user id"), domainErrors.ValidationError))
 		return
 	}
-	if err := h.userUseCase.Delete(id); err != nil {
+	if err := h.userUseCase.Delete(ctx.Request.Context(), id); err != nil {
 		_ = ctx.Error(err)
 		return
 	}

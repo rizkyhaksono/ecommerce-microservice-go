@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -17,11 +18,11 @@ import (
 // --- User UseCase ---
 
 type IUserUseCase interface {
-	GetAll() (*[]userDomain.User, error)
-	GetByID(id int) (*userDomain.User, error)
-	Create(user *userDomain.User) (*userDomain.User, error)
-	Update(id int, userMap map[string]interface{}) (*userDomain.User, error)
-	Delete(id int) error
+	GetAll(ctx context.Context) (*[]userDomain.User, error)
+	GetByID(ctx context.Context, id int) (*userDomain.User, error)
+	Create(ctx context.Context, user *userDomain.User) (*userDomain.User, error)
+	Update(ctx context.Context, id int, userMap map[string]interface{}) (*userDomain.User, error)
+	Delete(ctx context.Context, id int) error
 }
 
 type UserUseCase struct {
@@ -33,41 +34,41 @@ func NewUserUseCase(repo repository.UserRepositoryInterface, l *logger.Logger) I
 	return &UserUseCase{userRepository: repo, Logger: l}
 }
 
-func (s *UserUseCase) GetAll() (*[]userDomain.User, error) {
-	s.Logger.Info("Getting all users")
-	return s.userRepository.GetAll()
+func (s *UserUseCase) GetAll(ctx context.Context) (*[]userDomain.User, error) {
+	s.Logger.Ctx(ctx).Info("Getting all users")
+	return s.userRepository.GetAll(ctx)
 }
 
-func (s *UserUseCase) GetByID(id int) (*userDomain.User, error) {
-	s.Logger.Info("Getting user by ID", zap.Int("id", id))
-	return s.userRepository.GetByID(id)
+func (s *UserUseCase) GetByID(ctx context.Context, id int) (*userDomain.User, error) {
+	s.Logger.Ctx(ctx).Info("Getting user by ID", zap.Int("id", id))
+	return s.userRepository.GetByID(ctx, id)
 }
 
-func (s *UserUseCase) Create(u *userDomain.User) (*userDomain.User, error) {
-	s.Logger.Info("Creating new user", zap.String("email", u.Email))
+func (s *UserUseCase) Create(ctx context.Context, u *userDomain.User) (*userDomain.User, error) {
+	s.Logger.Ctx(ctx).Info("Creating new user", zap.String("email", u.Email))
 	hash, err := bcrypt.GenerateFromPassword([]byte(u.HashPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
 	u.HashPassword = string(hash)
-	return s.userRepository.Create(u)
+	return s.userRepository.Create(ctx, u)
 }
 
-func (s *UserUseCase) Update(id int, userMap map[string]interface{}) (*userDomain.User, error) {
-	s.Logger.Info("Updating user", zap.Int("id", id))
-	return s.userRepository.Update(id, userMap)
+func (s *UserUseCase) Update(ctx context.Context, id int, userMap map[string]interface{}) (*userDomain.User, error) {
+	s.Logger.Ctx(ctx).Info("Updating user", zap.Int("id", id))
+	return s.userRepository.Update(ctx, id, userMap)
 }
 
-func (s *UserUseCase) Delete(id int) error {
-	s.Logger.Info("Deleting user", zap.Int("id", id))
-	return s.userRepository.Delete(id)
+func (s *UserUseCase) Delete(ctx context.Context, id int) error {
+	s.Logger.Ctx(ctx).Info("Deleting user", zap.Int("id", id))
+	return s.userRepository.Delete(ctx, id)
 }
 
 // --- Auth UseCase ---
 
 type IAuthUseCase interface {
-	Login(email, password string) (*userDomain.User, *AuthTokens, error)
-	AccessTokenByRefreshToken(refreshToken string) (*userDomain.User, *AuthTokens, error)
+	Login(ctx context.Context, email, password string) (*userDomain.User, *AuthTokens, error)
+	AccessTokenByRefreshToken(ctx context.Context, refreshToken string) (*userDomain.User, *AuthTokens, error)
 }
 
 type AuthUseCase struct {
@@ -87,9 +88,9 @@ type AuthTokens struct {
 	ExpirationRefreshDateTime time.Time
 }
 
-func (s *AuthUseCase) Login(email, password string) (*userDomain.User, *AuthTokens, error) {
-	s.Logger.Info("User login attempt", zap.String("email", email))
-	user, err := s.UserRepository.GetByEmail(email)
+func (s *AuthUseCase) Login(ctx context.Context, email, password string) (*userDomain.User, *AuthTokens, error) {
+	s.Logger.Ctx(ctx).Info("User login attempt", zap.String("email", email))
+	user, err := s.UserRepository.GetByEmail(ctx, email)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -118,14 +119,14 @@ func (s *AuthUseCase) Login(email, password string) (*userDomain.User, *AuthToke
 	}, nil
 }
 
-func (s *AuthUseCase) AccessTokenByRefreshToken(refreshToken string) (*userDomain.User, *AuthTokens, error) {
-	s.Logger.Info("Refreshing access token")
+func (s *AuthUseCase) AccessTokenByRefreshToken(ctx context.Context, refreshToken string) (*userDomain.User, *AuthTokens, error) {
+	s.Logger.Ctx(ctx).Info("Refreshing access token")
 	claimsMap, err := s.JWTService.GetClaimsAndVerifyToken(refreshToken, "refresh")
 	if err != nil {
 		return nil, nil, err
 	}
 	userID := int(claimsMap["id"].(float64))
-	user, err := s.UserRepository.GetByID(userID)
+	user, err := s.UserRepository.GetByID(ctx, userID)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -14,7 +14,7 @@ The system is composed of the following services:
 | **Order Service** | `9093` | Order Processing & History | `order_db` |
 
 ### Tech Stack
-- **Language**: Go 1.24+
+- **Language**: Go 1.27.4+
 - **Framework**: Gin Web Framework
 - **Database**: PostgreSQL (GORM)
 - **Infrastructure**: Docker, Docker Compose
@@ -41,7 +41,7 @@ The system is composed of the following services:
 
 ### Prerequisites
 - Docker & Docker Compose
-- Go 1.24+ (optional, for local dev)
+- Go 1.27.4+ (optional, for local dev)
 - Make (optional)
 
 ### Quick Start (Docker)
@@ -52,14 +52,21 @@ The system is composed of the following services:
    cd ecommerce-microservice-go
    ```
 
-2. **Start all services**
+2. **Configure local secrets**
+   ```bash
+   cp .env.example .env
+   ```
+   Set `POSTGRES_PASSWORD` in `.env`. Docker Compose substitutes that value into
+   the database services. `.env` is gitignored.
+
+3. **Start all services**
    ```bash
    make up
    # OR
    docker compose up -d --build
    ```
 
-3. **Verify**
+4. **Verify**
    Check if all containers are running:
    ```bash
    docker compose ps

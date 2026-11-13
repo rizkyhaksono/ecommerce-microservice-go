@@ -1,20 +1,35 @@
 # Security Policy
 
-## Supported Versions
+## Supported versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+Security fixes land on the `main` branch. This repository does not publish
+versioned releases; use the latest commit on `main`.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.1.x   | :white_check_mark: |
-| 1.0.x   | :white_check_mark: |
-| < 0.1   | :x:                |
+| Branch | Supported |
+| --- | --- |
+| `main` | Yes |
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
-Use this section to tell people how to report a vulnerability.
+Report security issues privately through GitHub Security Advisories:
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+https://github.com/rizkyhaksono/ecommerce-microservice-go/security/advisories/new
+
+Do not open a public issue for a suspected vulnerability.
+
+Include:
+
+- what is affected (service, module, workflow, or image) and the impact
+- the commit you tested
+- steps or a proof of concept to reproduce, if you have one
+
+You should receive an acknowledgement within 7 days. If the report is accepted,
+a fix is prepared on `main` and disclosure is coordinated with you. If it is
+declined, the response explains why.
+
+## Secrets
+
+Do not commit `.env` files, database passwords, or JWT signing keys. Copy
+`.env.example` to `.env` and set `POSTGRES_PASSWORD` before running Docker
+Compose. Production deploys must inject `POSTGRES_PASSWORD` and the JWT secrets
+through the environment.

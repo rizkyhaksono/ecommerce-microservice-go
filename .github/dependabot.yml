@@ -1,12 +1,28 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+# Dependabot version updates for every module, service image, and workflow.
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
 version: 2
 updates:
-  - package-ecosystem: "bundler" # See documentation for possible values
-    vendor: true
-    directory: "/" # Location of package manifests
+  - package-ecosystem: gomod
+    directories:
+      - /pkg
+      - /services/catalog
+      - /services/gateway
+      - /services/order
+      - /services/user
     schedule:
-      interval: "weekly"
+      interval: weekly
+
+  - package-ecosystem: docker
+    directories:
+      - /services/catalog
+      - /services/gateway
+      - /services/order
+      - /services/user
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -1,7 +1,10 @@
 # IDE Folders and Files
 .idea
 .DS_Store
+# Local secrets. Keep *.env.example tracked.
 .env
+.env.*
+!.env.example
 
 
 *.txt

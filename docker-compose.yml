@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: user_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     ports:
       - "5500:5432"
     volumes:
@@ -21,7 +21,7 @@ services:
     environment:
       POSTGRES_DB: catalog_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     ports:
       - "5501:5432"
     volumes:
@@ -37,7 +37,7 @@ services:
     environment:
       POSTGRES_DB: order_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     ports:
       - "5502:5432"
     volumes:
@@ -59,7 +59,7 @@ services:
       DB_HOST: user-db
       DB_PORT: "5432"
       DB_USER: postgres
-      DB_PASSWORD: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       DB_NAME: user_db
       DB_SSLMODE: disable
       JWT_ACCESS_SECRET_KEY: ${JWT_ACCESS_SECRET_KEY:-super-secret-access-key}
@@ -92,7 +92,7 @@ services:
       DB_HOST: catalog-db
       DB_PORT: "5432"
       DB_USER: postgres
-      DB_PASSWORD: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       DB_NAME: catalog_db
       DB_SSLMODE: disable
       JWT_ACCESS_SECRET_KEY: ${JWT_ACCESS_SECRET_KEY:-super-secret-access-key}
@@ -120,7 +120,7 @@ services:
       DB_HOST: order-db
       DB_PORT: "5432"
       DB_USER: postgres
-      DB_PASSWORD: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       DB_NAME: order_db
       DB_SSLMODE: disable
       JWT_ACCESS_SECRET_KEY: ${JWT_ACCESS_SECRET_KEY:-super-secret-access-key}
